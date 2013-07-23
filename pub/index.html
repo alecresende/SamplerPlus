@@ -1,0 +1,33 @@
+<html>
+
+<head>
+<link rel="stylesheet" type="text/css" href="style.css">
+
+</head>
+<body>
+</body>
+
+
+<form class="form" method="post" enctype="multipart/form-data" action="/upload">
+	<p class="name">
+		<input type="text" name="name" id="name" />
+		<label for="name">Name</label>
+	</p>
+
+	<p class="tags">
+		<input type="text" name="tags" id="tags" />
+		<label for="tags">Tags (Separated By Commas)</label>
+	</p>
+
+	<p class="file">
+      <input type="file" name="file">
+	  <label for="file"> File To Upload </label>
+	</p>
+
+	<p class="submit">
+		<input type="submit" value="Send" />
+	</p>
+
+</form>
+
+</html>
