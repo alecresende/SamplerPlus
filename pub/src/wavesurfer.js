@@ -1,3 +1,6 @@
+// Edited from wavesurfer.js
+// found at https://github.com/katspaugh/wavesurfer.js/
+
 'use strict';
 
 var WaveSurfer = {
@@ -9,6 +12,8 @@ var WaveSurfer = {
         // extract relevant parameters (or defaults)
         this.params = WaveSurfer.util.extend({}, this.defaultParams, params);
 
+		this.isDragging = false;
+
         this.drawer = Object.create(WaveSurfer.Drawer);
         this.drawer.init(this.params);
 		this.weirdDrawer = null;
@@ -18,6 +23,7 @@ var WaveSurfer = {
 		this.selected = false;
 
         this.markers = {};
+		this.m = null;
 
         this.createBackend();
         this.bindClick();
@@ -38,30 +44,43 @@ var WaveSurfer = {
         });
     },
 
+	render: function(name) {
+		var blob =  this.backend.render(name);
+		console.log("AGAIN BLOB = " + blob.size);
+		return blob;
+	},
+	
+	close: function() {
+		this.backend.close();
+		delete this.backend;
+	},
+
 	getAdjustedPercent: function() {
 			var dura = this.backend.getDuration();
-			//console.log("SELECT TIME = " + this.backend.ac.currentTime);
-			//console.log("DURATION = " + this.backend.getDuration());
-			//console.log("START TIME = " + this.backend.startTime);
+			/*
+			console.log("SELECT TIME = " + this.backend.ac.currentTime);
+			console.log("DURATION = " + this.backend.getDuration());
+			console.log("START TIME = " + this.backend.startTime);
+			console.log("FIRST START  = " + this.backend.firstStart);
+			*/
 			var loopTime = (this.selectionEnd * dura) - (this.selectionStart * dura);
-			var timeElapsed = this.backend.ac.currentTime - this.backend.startTime;
-			//console.log("TIME ELAPSED = "+timeElapsed);
+			var timeElapsed =  this.backend.totalElapsed + this.backend.ac.currentTime - this.backend.startTime; 
+
+
+			if (this.backend.isPaused())
+				timeElapsed = this.backend.totalElapsed  
+
 
 			var posInLoop = timeElapsed % loopTime;
-			//console.log("PosInLoop = "+posInLoop);
 			
 			var startTime  = this.backend.getLoopStart();
-			//console.log("START TIME = " + startTime);
 
 			var exactLocation = startTime + posInLoop;
-			//console.log("ExACT LOCATION = " + exactLocation);
-			//console.log("********************");
 			return exactLocation / dura;
 	},
 
     onAudioProcess: function (progress) {
 		if( progress >= 1.0) {
-			console.log("PROGRESS =" +progress);
 		}
         // pause when finished
 		/*
@@ -74,11 +93,15 @@ var WaveSurfer = {
 
 		if(this.selected) {
 			
-			this.drawer.progress(this.getAdjustedPercent());
+			var adj = this.getAdjustedPercent();
+			this.drawer.progress(adj);
+
 		}
-		else {
+
+		else
 			this.drawer.progress(progress - Math.floor(progress));
-		}
+
+
         this.fireEvent('progress', progress);
     },
 
@@ -93,8 +116,12 @@ var WaveSurfer = {
 
     playPause: function () {
         if (this.backend.paused) {
+			
             var playedPercent = this.backend.getPlayedPercents();
-            if (playedPercent >= 1.0) playedPercent = 0;
+            if (playedPercent >= 1.0) {
+				playedPercent = 0;
+				console.log("PLAY PAUSED");
+			}
             this.playAt(playedPercent);
         } else {
 			console.log("PAUSE!");
@@ -201,11 +228,46 @@ var WaveSurfer = {
     },
 
 	loadFromBuffer: function (buf) {
+		console.log("LOAD FROM BUFFER BUFFER ***");
 		this.backend.loadData2(
                 buf,
                 this.drawBuffer.bind(this)
 							  );
 	},
+
+	mixAt: function (buf) {
+
+		var dura = this.backend.currentBuffer.duration;
+		var pro = this.drawer.last_progress * dura;
+		var newBuff = mixAt(this.backend.ac, this.backend.currentBuffer, buf, pro);
+		this.loadFromBuffer(newBuff);
+
+	},
+	insertAt: function (buf) {
+		
+		console.log("CLIPBOARD IS " + buf.duration + " seconds");
+		var dura = this.backend.currentBuffer.duration;
+		console.log("LAST PROGRESS = " + this.drawer.last_progress);
+		var pro = this.drawer.last_progress * dura;
+		
+		console.log("INSDERT AT " + pro);
+		
+		var newBuff = insertAt(this.backend.ac, this.backend.currentBuffer, buf, pro);
+		this.loadFromBuffer(newBuff);
+		
+	},
+
+	loadObject: function (url) {
+		var my = this;
+		
+		console.log("URL LENGTH = "+ url.byteLength);
+		my.drawer.loading(1);
+		my.backend.loadData(
+							url,
+							my.drawBuffer.bind(my)
+							)
+},
+
     /**
      * Loads an audio file via XHR.
      */
@@ -270,9 +332,35 @@ var WaveSurfer = {
 		this.selected = false;
 		this.drawer.select(0,1);
 		
+		
 		return cropped_buf;
 	},
 	
+	replaceWithSilence: function() {
+		var buf = this.backend.currentBuffer;
+		var start = this.selectionStart * this.backend.getDuration();
+		var finish = this.selectionEnd * this.backend.getDuration();
+
+		var modified = replaceWithSilence(this.backend.ac, buf, start, finish);
+		this.drawer.select(0,1);
+		
+		
+		return modified;
+		
+	},
+
+	copy: function() {
+		var buf = this.backend.currentBuffer;
+		var start = this.selectionStart * this.backend.getDuration();
+		var finish = this.selectionEnd * this.backend.getDuration();
+
+		var modified = copySelection(this.backend.ac, buf, start, finish);
+		console.log("DURATION OF MODIFIED = " + modified.duration);
+		
+		return modified;
+	
+	},
+
     /**
      * Click to seek.
      */
@@ -283,26 +371,73 @@ var WaveSurfer = {
 
 		var my = this;
 		this.drawer.container.addEventListener('dragstart', function (e) {
+				e.preventDefault();
 				var relX = e.offsetX;
+				my.isDragging = true;
 				if (null == relX) { relX = e.layerX; }
 				var progress = relX / my.drawer.width;
 				my.selectionStart = progress;
 				console.log("DRAG START********** " + progress);
 			});
-		this.drawer.container.addEventListener('mouseup', function (e) {
-				var relX = e.offsetX;
-				if (null == relX) { relX = e.layerX; }
-				var progress = relX / my.drawer.width;
-				my.selectionEnd = progress;
-				my.selected = true;
-				console.log("DRAG END******");
-				
-				my.seekTo(my.selectionStart);
-				my.backend.selection(my.selectionStart, my.selectionEnd);
 
-				my.drawer.select(my.selectionStart, my.selectionEnd);
+		$(this.drawer.container).mousemove(function (e) {
+				if(my.isDragging) {
+					console.log("FUCKKKK");
+					
+					var relX = e.offsetX;
+					if (null == relX) { relX = e.layerX; }
+					var progress = relX / my.drawer.width;
+					my.selectionEnd = progress;
+					my.selected = true;
+					console.log("DRAG END******");
+					
+					//my.seekTo(my.selectionStart);
+					my.backend.selection(my.selectionStart, my.selectionEnd);
+					
+					my.drawer.select(my.selectionStart, my.selectionEnd);
+					
+					/*
+					console.log("ABOUT TO PLAY!");
+					my.playPause();
+					*/
+					
+				}
+			
+			});
+
+		this.drawer.container.addEventListener('mouseup', function (e) {
+				if(my.isDragging) {
+					var relX = e.offsetX;
+					my.isDragging = false;
+					if (null == relX) { relX = e.layerX; }
+					var progress = relX / my.drawer.width;
+					my.selectionEnd = progress;
+					my.selected = true;
+					console.log("DRAG END******");
+					
+					my.seekTo(my.selectionStart);
+					my.backend.selection(my.selectionStart, my.selectionEnd);
+					
+					my.drawer.select(my.selectionStart, my.selectionEnd);
+				}
 				
 			});
+
+		document.addEventListener('keydown', function(e) {
+			e.preventDefault();
+			console.log("YOOOOOOOOOOOOOOOOOOOOOOOOOOOO " + e.keyCode);
+			if(e.keyCode == 32) {
+				var timings = my.timings(0);
+				var per = timings[0]/timings[1];
+				var marker = Object.create(WaveSurfer.Mark);
+				marker.percentage = per;
+				marker.id = 'paste-mark';
+				console.log("Space is pressed at " + per );
+				my.drawer.addMark(marker);
+			}
+			
+		});
+											   
         this.drawer.container.addEventListener('click', function (e) {
 				console.log("SEEKING");
 				var relX = e.offsetX;
@@ -325,7 +460,9 @@ var WaveSurfer = {
         var markers = this.markers;
 
         this.on('progress', function (progress) {
+
             var normProgress = my.normalizeProgress(progress);
+
 
             Object.keys(markers).forEach(function (id) {
                 var marker = markers[id];

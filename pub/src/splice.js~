@@ -1,0 +1,35 @@
+function AudioPart(audiobuffer, delay, offset, duration) {
+	
+	this.buffer = audiobuffer;
+	this.offset = offset; // offset of the audio audiobuffer
+	this.delay = delay;
+	this.duration = duration;
+
+}
+
+
+// need an array to represent a spliced audio
+
+function playArray(arr, context, webaudio, offset) {
+	console.log("WASSAP PLAY ARRAY");
+	console.log(arr);
+	for(var i in arr) {
+		console.log("PLAYin ARRAY " + i);
+		
+		var audiop = arr[i];
+		var source = context.createBufferSource();
+		webaudio.setSource(source);
+		source.buffer = audiop.buffer;
+		
+		if(i==0)
+			source.start(audiop.delay, offset, audiop.duration);
+		else
+			source.start(audiop.delay, audiop.offset, audiop.duration);
+
+		console.log("PLAYING IT delay = " + audiop.delay + " offset = " + audiop.offset + " duration = " + audiop.duration);
+		console.log(source.buffer);
+	}
+	
+}
+
+

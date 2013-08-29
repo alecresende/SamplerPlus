@@ -1,3 +1,6 @@
+// Edited from wavesurfer.js
+// found at https://github.com/katspaugh/wavesurfer.js/
+
 'use strict';
 
 WaveSurfer.Drawer = {
@@ -21,6 +24,7 @@ WaveSurfer.Drawer = {
         this.container = this.params.container;
         this.width = this.container.clientWidth;
         this.height = this.container.clientHeight;
+		this.last_progress = 0;
 
         this.createSvg();
     },
@@ -108,6 +112,8 @@ WaveSurfer.Drawer = {
 				height : this.height/6,
 				fill : this.params.selectionColor 
 			});
+		
+		$(selection).draggable({opacity : 0.5, "axis" : "x"});
 
         // Loader
         var loader = this.node('line', {
@@ -166,6 +172,7 @@ WaveSurfer.Drawer = {
 	},
 
     progress: function (progress) {
+		this.last_progress = progress;
         var pos = Math.round(progress * this.width);
         if (pos != this.lastPos) {
             this.progressPath.setAttribute('width', pos);

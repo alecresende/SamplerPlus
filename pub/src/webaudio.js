@@ -1,4 +1,5 @@
-'use strict';
+b// Edited from wavesurfer.js
+// found at https://github.com/katspaugh/wavesurfer.js/
 
 WaveSurfer.WebAudio = {
     defaultParams: {
@@ -17,6 +18,11 @@ WaveSurfer.WebAudio = {
         this.byteTimeDomain = new Uint8Array(this.params.fftSize);
 		this.currentBuffers = new Array();
         this.byteFrequency = new Uint8Array(this.params.fftSize);
+		this.lastElapsed = 0;
+
+		this.totalElapsed = 0;
+		this.firstStart = 0;
+		this.totalPauseTime = 0;
 
 		this.players = null;
         this.paused = true;
@@ -46,12 +52,19 @@ WaveSurfer.WebAudio = {
     },
 
 	
+	render: function(name) {
+		return renderAudio(this.currentBuffer, name);
+	},
+
 	getLoopStart: function() {
 		return this.players[0].loopStart;
 	},
 
 	selection: function (start, finish) {
 		
+		this.totalElapsed = 0;
+		this.totalPauseTime = 0;
+		this.firstStart = 0; 
 		if(this.players != null) {
 			var x = this.players[0];
 			console.log(x);
@@ -60,10 +73,20 @@ WaveSurfer.WebAudio = {
 			x.loopEnd = dura*finish;
 			x.start(0,0, x.loopEnd - x.loopStart);
 			this.startTime = this.ac.currentTime;
+
+			
+			console.log("LOOP START HAS BEEN SET TO = " + this.players[0].loopStart);
 		}
+		
 		
 	},
 	
+	close: function () {
+		this.source && this.source.disconnect(0);
+		this.analyzer && this.analyzer.disconnect();
+		this.scriptNode && this.scriptNode.disconnect();
+	},
+
     setSource: function (source) {
 		console.log("SOURCE YALL");
         this.source && this.source.disconnect();
@@ -115,6 +138,7 @@ WaveSurfer.WebAudio = {
 									function (buffer) {
 										my.lastStart = 0;
 										my.lastPause = 0;
+										my.totalElasped = 0;
 										my.startTime = null;
 										
 										cb && cb(buffer);
@@ -133,9 +157,14 @@ WaveSurfer.WebAudio = {
 	},
 	
 	loadData2: function (buffer, cb, errb) {
+		console.log("*****************************************");
 		this.currentBuffer = buffer;
+		
+
+
 		this.lastStart = 0;
 		this.lastPause = 0;
+		this.totalElapsed = 0;
 		this.startTime = null;
 		this.currentBuffers = new Array();
 		this.currentBuffers[0] = new AudioPart(buffer, 0, 0, buffer.duration);
@@ -195,12 +224,26 @@ WaveSurfer.WebAudio = {
      */
     play: function (start, end, delay) {
         if (!this.currentBuffer) {
+			console.log("BALLZ");
             return;
         }
 
         this.pause();
 		
-		this.players = playArray(this.currentBuffers, this.ac, this, start);
+		if(this.players == null)  {
+			
+			console.log("WOW FUCK YUOU ITS NULL");
+			this.lastElapsed = 0;
+			this.players = playArray(this.currentBuffers, this.ac, this, start, -1, -1);
+		}
+		else {
+			console.log("OKO OK OK OK ITS NOT NULL");
+			var loops = this.players[0].loopStart;
+			var loope = this.players[0].loopEnd;
+
+			this.players = playArray(this.currentBuffers, this.ac, this, start, loops, loope);
+		}
+			
 		this.paused = false;
 		/*
         this.setSource(this.ac.createBufferSource());
@@ -214,7 +257,12 @@ WaveSurfer.WebAudio = {
         if (null == delay) { delay = 0; }
 
         this.lastStart = start;
+		if (this.firstStart == 0)
+			this.firstStart = start;
         this.startTime = this.ac.currentTime;
+		
+
+		this.totalPauseTime = this.totalPauseTime + this.lastPause - this.startTime;
 		/*
         this.source.noteGrainOn(delay, start, end - start);
 
@@ -231,6 +279,8 @@ WaveSurfer.WebAudio = {
         }
 
         this.lastPause = this.getCurrentTime();
+
+		this.totalElapsed = this.totalElapsed + this.lastPause - this.lastStart;
 
         this.source.noteOff(delay || 0);
 
