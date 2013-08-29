@@ -6,6 +6,9 @@ Specifically "mysql" and "express"
 So to install them using the node package manager, type 
 "npm install express"
 "npm install mysql"
+"npm install fs"
+"npm install path"
+"npm install jquery"
 
 Also you'll need a mysql database running with a db called samples, in which
 has a table called Samples with the field
