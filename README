@@ -1,0 +1,8 @@
+The webserver runs from test-site.js using node.js.
+So to run the site just type "node test-site.js"
+
+However, you'll need a few packages installed to work with node.js
+Specifically "mysql" and "express"
+So to install them using the node package manager, type 
+"npm install express"
+"npm install mysql"
