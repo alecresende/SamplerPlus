@@ -1,13 +1,33 @@
 var express = require('express');
 var mysql = require ('mysql');
 
+var $ = require ('jquery');
+
 var connection = mysql.createConnection({
 		host : 'localhost',
 		user : 'root',
-		password : 'gaybriel'
+		password : 'yr password'
 	});
 
 connection.connect();
+
+var folders = {};
+
+
+function configFolders(f) {
+	connection.query('use samples;');
+	
+	var out = []
+	for(var i=0;i<f.length;i++) {
+		console.log("select * from Samples where Path like \'"+f[i]+"\';");
+		connection.query("select * from Samples where Path like \'"+f[i]+"\';",
+						 function (err, rows, fields) {
+							 out.push(rows);
+						 }
+						);
+	}
+	return out;
+}
 
 var app = express();
 var path = require('path');
@@ -45,6 +65,16 @@ app.post('/search', function(req, res) {
 	});
 
 
+app.post('/newFolder', function(req, res) {
+		
+	console.log("GETTING NEW FOLDER REQUEWSR");
+	console.log(req.body.list);
+	console.log(req.body.name);
+	folders[req.body.name] = configFolders(req.body.list.split(";"));
+	
+	
+});
+
 app.post('/upload', function(req, res) {
 		
 		if(req.files == null) console.log('WHAT 2');
@@ -70,6 +100,9 @@ app.post('/upload', function(req, res) {
 		res.redirect('/');
 	});
 
+app.get('/folders', function(req,res) {
+	res.send(folders);
+});
 
 app.get('/tags/:id?', function(req, res){
 		var ids = req.route.params.id;

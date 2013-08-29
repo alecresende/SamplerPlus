@@ -6,3 +6,21 @@ Specifically "mysql" and "express"
 So to install them using the node package manager, type 
 "npm install express"
 "npm install mysql"
+
+Also you'll need a mysql database running with a db called samples, in which
+has a table called Samples with the field
+
+You can use the following command to do so.
+
+CREATE TABLE Samples
+(
+P_Id int NOT NULL,
+Path varchar(255) NOT NULL,
+Artist varchar(255),
+Title varchar(255),
+Tags varchar(255),
+PRIMARY KEY (P_Id)
+)
+
+So once you do this, you can go into test-site.js and edit in your 
+mysql login details to match your mysql info.
